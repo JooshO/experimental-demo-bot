@@ -28,6 +28,7 @@ import edu.wpi.first.wpilibj.simulation.DifferentialDrivetrainSim;
 import edu.wpi.first.wpilibj.smartdashboard.Field2d;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 
+// REFERENCES
 // https://docs.wpilib.org/en/stable/docs/software/wpilib-tools/robot-simulation/drivesim-tutorial/drivetrain-model.html
 // https://github.com/CrossTheRoadElec/Phoenix-Examples-Languages/blob/master/Java%20General/DifferentialDrive_Simulation/src/main/java/frc/robot/Robot.java
 // https://docs.ctre-phoenix.com/en/stable/ch15a_Simulation.html 
@@ -73,6 +74,8 @@ public class Drivetrain implements AutoCloseable {
         static final boolean kRightSideInverted = true;
         /** Whether the left leader motor is inverted */
         static final boolean kLeftSideInverted = false;
+        /** Minimum seconds from idle to full speed in open loop (acts as a cap on acceleration) */
+        static final double kOpenLoopRampS = 0.2;
 
         /** PID Gains for driving straight with motion magic */
         static final Gains driveGains = new Gains(0.24, 0.15, 0.002, .015, 500, 0.5);//.24f
@@ -183,6 +186,9 @@ public class Drivetrain implements AutoCloseable {
         m_followRightMotor.setInverted(InvertType.FollowMaster);
         m_followLeftMotor.setInverted(InvertType.FollowMaster);
 
+        m_leaderRightMotor.configOpenloopRamp(Constants.kOpenLoopRampS);
+        m_leaderLeftMotor.configOpenloopRamp(Constants.kOpenLoopRampS);
+
         //#region PID Config
         // the region tag lets me collapse this section in vscode. Everything contained configures the motion magic PID
         // config left selected sensor, point right at that sensor for use in turning/distance PID
@@ -290,11 +296,13 @@ public class Drivetrain implements AutoCloseable {
         m_driveSim.setInputs(m_leaderLeftSim.getMotorOutputLeadVoltage(), -m_leaderRightSim.getMotorOutputLeadVoltage());
         m_driveSim.update(RobotMap.SIM_PERIOD_MS / 1000.0);
         
+        // manually set integrated sensor positions based on drive train
         m_leaderLeftSim.setIntegratedSensorRawPosition(distanceToNativeUnits(m_driveSim.getLeftPositionMeters()));
         m_leaderRightSim.setIntegratedSensorRawPosition(distanceToNativeUnits(-m_driveSim.getRightPositionMeters()));
         m_leaderLeftSim.setIntegratedSensorVelocity(velocityToNativeUnits(m_driveSim.getLeftVelocityMetersPerSecond()));
         m_leaderRightSim.setIntegratedSensorVelocity(velocityToNativeUnits(-m_driveSim.getRightVelocityMetersPerSecond()));
 
+        // manually update NavX with heading
         int dev = SimDeviceDataJNI.getSimDeviceHandle("navX-Sensor[0]");
         SimDouble angle = new SimDouble(SimDeviceDataJNI.getSimValueHandle(dev, "Yaw"));
         angle.set(-m_driveSim.getHeading().getDegrees());
